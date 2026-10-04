@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar, ActiveTab } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
-import { WorkflowView } from './components/WorkflowView';
-import { MLTrainingView } from './components/MLTrainingView';
-import { CodeArtifactsView } from './components/CodeArtifactsView';
 import { AttackLabView } from './components/AttackLabView';
-import { VivaDefenseView } from './components/VivaDefenseView';
+import { MLAnalyticsView } from './components/MLAnalyticsView';
+import { ArchitectureView } from './components/ArchitectureView';
 import { ClickDetailModal } from './components/ClickDetailModal';
 import { ExportReportModal } from './components/ExportReportModal';
 import { AdClickEvent, FlinkEngineState, KafkaConsumerLagState } from './types/fraud';
@@ -55,7 +53,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       
-      {/* Strict 3-Zone Top Navigation Bar */}
+      {/* Navigation Header */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -64,7 +62,7 @@ export default function App() {
         onOpenExportModal={() => setIsExportModalOpen(true)}
       />
 
-      {/* Main Container */}
+      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {activeTab === 'dashboard' && (
           <DashboardView
@@ -77,28 +75,20 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'workflow' && (
-          <WorkflowView />
-        )}
-
-        {activeTab === 'ml-training' && (
-          <MLTrainingView />
-        )}
-
-        {activeTab === 'code' && (
-          <CodeArtifactsView />
-        )}
-
         {activeTab === 'attack-lab' && (
           <AttackLabView 
             onAttackLaunched={() => {
-              // Stay on current tab or switch to dashboard
+              // Stay on current tab or switch to live monitor
             }}
           />
         )}
 
-        {activeTab === 'viva' && (
-          <VivaDefenseView />
+        {activeTab === 'ml-analytics' && (
+          <MLAnalyticsView />
+        )}
+
+        {activeTab === 'architecture' && (
+          <ArchitectureView />
         )}
       </main>
 
@@ -118,21 +108,20 @@ export default function App() {
         />
       )}
 
-      {/* Quiet Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/80 py-6 text-xs text-slate-500">
+      {/* Clean Modern Footer */}
+      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-400">FlinkGuard</span>
+            <span className="font-semibold text-slate-300">FlinkGuard</span>
             <span>·</span>
-            <span>Real-Time Advertisement Click Fraud Detection System</span>
-            <span>·</span>
-            <span>Kaggle TalkingData ML + Apache Flink & Kafka</span>
+            <span>Real-Time Ad Click Fraud Prevention Platform</span>
           </div>
-          <div className="flex items-center gap-4 text-slate-500 font-mono">
-            <span>Apache Flink 1.18</span>
-            <span>Apache Kafka (KRaft)</span>
-            <span>XGBoost / RandomForest</span>
-            <span>PostgreSQL & Parquet</span>
+          <div className="flex items-center gap-4 text-slate-500 font-mono text-[11px]">
+            <span>Latency &lt; 25ms</span>
+            <span>·</span>
+            <span>Apache Flink & Kafka</span>
+            <span>·</span>
+            <span>XGBoost ML</span>
           </div>
         </div>
       </footer>
