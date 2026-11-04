@@ -1,9 +1,9 @@
 """
 Threat Intelligence Service - AbuseIPDB Integration
 Features:
-- Persistent, process-safe and thread-safe SQLite-backed caching (survives server restarts and multi-worker reload)
-- In-memory fallback with threading.Lock()
-- Real-time AbuseIPDB v2 lookup
+- Bogon / Private / Loopback IP address pre-validation (prevents AbuseIPDB 422 Unprocessable Entity)
+- Persistent, process-safe and thread-safe SQLite-backed caching (survives server restarts)
+- Real-time AbuseIPDB v2 lookup with quota and missing-key fallback safety
 - Hybrid Fusion Decision Logic
 """
 
@@ -12,6 +12,7 @@ import time
 import json
 import sqlite3
 import threading
+import ipaddress
 import requests
 from typing import Dict, Any, Optional
 
@@ -40,6 +41,14 @@ def _init_sqlite_cache():
             conn.commit()
 
 _init_sqlite_cache()
+
+def is_public_ip(ip_str: str) -> bool:
+    """Validates if an IP address is a public routable address (filters Bogon/Private/Loopback)."""
+    try:
+        ip = ipaddress.ip_address(ip_str.strip())
+        return not (ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_multicast or ip.is_link_local)
+    except ValueError:
+        return False
 
 def get_cached_ip(ip_address: str) -> Optional[Dict[str, Any]]:
     """Retrieves IP from persistent SQLite cache if within TTL."""
@@ -79,9 +88,9 @@ def set_cached_ip(ip_address: str, data: Dict[str, Any]):
             print(f"[!] Cache write error for {ip_address}: {e}")
 
 def check_abuseipdb_raw(ip_address: str, api_key: str = DEFAULT_API_KEY) -> Optional[Dict[str, Any]]:
-    """Direct lookup to AbuseIPDB REST API v2."""
+    """Direct lookup to AbuseIPDB REST API v2 with Bogon and Quota handling."""
     if not api_key:
-        print("[!] AbuseIPDB API key not configured.")
+        print("[!] AbuseIPDB API key not configured. Serving local threat assessment.")
         return None
 
     headers = {
@@ -96,6 +105,15 @@ def check_abuseipdb_raw(ip_address: str, api_key: str = DEFAULT_API_KEY) -> Opti
 
     try:
         response = requests.get(ABUSEIPDB_API_URL, headers=headers, params=querystring, timeout=8)
+        
+        # If rate limit exceeded (HTTP 429) or unprocessable (HTTP 422)
+        if response.status_code == 429:
+            print(f"[!] AbuseIPDB rate limit (1,000/day) reached. Serving fallback intelligence.")
+            return None
+        if response.status_code == 422:
+            print(f"[!] AbuseIPDB rejected address {ip_address} as unroutable/private.")
+            return None
+
         response.raise_for_status()
         raw_data = response.json().get('data', {})
 
@@ -120,22 +138,44 @@ def check_abuseipdb_raw(ip_address: str, api_key: str = DEFAULT_API_KEY) -> Opti
         return None
 
 def get_ip_reputation(ip_address: str, api_key: str = DEFAULT_API_KEY) -> Dict[str, Any]:
-    """Thread-safe and restart-persistent cached IP lookup."""
+    """
+    Thread-safe and restart-persistent cached IP lookup.
+    Prevents API 422 errors on private/bogon IPs.
+    """
     ip_clean = ip_address.strip()
 
-    # 1. Check persistent SQLite cache
+    # 1. Intercept private / loopback / bogon IP addresses
+    if not is_public_ip(ip_clean):
+        return {
+            'ip': ip_clean,
+            'is_public': False,
+            'is_whitelisted': True,
+            'abuse_confidence_score': 0,
+            'normalized_abuse_score': 0.0,
+            'country_code': 'LOCAL',
+            'usage_type': 'Private LAN / RFC-1918 / Loopback',
+            'isp': 'Internal Local Network',
+            'domain': 'internal.lan',
+            'is_tor': False,
+            'total_reports': 0,
+            'last_reported_at': None,
+            'cached': True,
+            'note': 'Private / RFC-1918 internal IP. Bypassed external threat intel check.'
+        }
+
+    # 2. Check persistent SQLite cache
     cached = get_cached_ip(ip_clean)
     if cached:
         return cached
 
-    # 2. Query live AbuseIPDB API
+    # 3. Query live AbuseIPDB API
     fresh = check_abuseipdb_raw(ip_clean, api_key)
     if fresh:
         set_cached_ip(ip_clean, fresh)
         fresh['cached'] = False
         return fresh
 
-    # 3. Graceful fallback on network failure or rate-limit
+    # 4. Graceful fallback on network failure or rate-limit
     return {
         'ip': ip_clean,
         'is_public': True,
@@ -143,8 +183,8 @@ def get_ip_reputation(ip_address: str, api_key: str = DEFAULT_API_KEY) -> Dict[s
         'abuse_confidence_score': 0,
         'normalized_abuse_score': 0.0,
         'country_code': 'XX',
-        'usage_type': 'Unknown',
-        'isp': 'Unknown',
+        'usage_type': 'Unknown Network',
+        'isp': 'Fallback Provider',
         'domain': '',
         'is_tor': False,
         'total_reports': 0,
@@ -156,7 +196,7 @@ def get_ip_reputation(ip_address: str, api_key: str = DEFAULT_API_KEY) -> Dict[s
 def hybrid_fusion_risk_score(ml_fraud_prob: float, abuse_info: Dict[str, Any], ml_weight: float = 0.60) -> Dict[str, Any]:
     """
     Blends local ML behavioral score with external threat intelligence:
-    Final Score = (ML_Prob * 0.60) + (AbuseIPDB_Score * 0.40)
+    Final Score = (ML_Prob * ml_weight) + (AbuseIPDB_Score * (1 - ml_weight))
     """
     intel_weight = 1.0 - ml_weight
     intel_score = abuse_info.get('normalized_abuse_score', 0.0)
@@ -175,6 +215,8 @@ def hybrid_fusion_risk_score(ml_fraud_prob: float, abuse_info: Dict[str, Any], m
         "final_risk_score": round(final_score, 4),
         "ml_probability": round(ml_fraud_prob, 4),
         "abuseipdb_score": round(intel_score, 4),
+        "ml_weight": ml_weight,
+        "intel_weight": round(intel_weight, 2),
         "action": action,
         "is_blocked": is_blocked,
         "threat_intel": abuse_info

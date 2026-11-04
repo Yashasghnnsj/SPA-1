@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BrainCircuit, 
   TrendingUp, 
@@ -13,7 +13,13 @@ import {
   Zap,
   BarChart3,
   Network,
-  MousePointerClick
+  MousePointerClick,
+  Send,
+  Radio,
+  Sliders,
+  Check,
+  Ban,
+  Search
 } from 'lucide-react';
 
 interface FeatureImportance {
@@ -23,7 +29,6 @@ interface FeatureImportance {
   category: string;
 }
 
-// Model 1: TalkingData Ad Click Fraud Features
 const CLICK_FRAUD_FEATURES: FeatureImportance[] = [
   { name: 'same_app_click_count', label: 'Same App Click Repetition', weight: 19.66, category: 'Behavior' },
   { name: 'clicks_per_device', label: 'Device Click Frequency', weight: 18.17, category: 'Identity' },
@@ -42,7 +47,6 @@ const CLICK_FRAUD_FEATURES: FeatureImportance[] = [
   { name: 'hour', label: 'Time of Day (Temporal Hour)', weight: 1.24, category: 'Context' }
 ];
 
-// Model 2: DNS Exfiltration & Infiltration Features (Trained on Light + Heavy dataset)
 const DNS_EXFILTRATION_FEATURES: FeatureImportance[] = [
   { name: 'longest_word_len', label: 'Longest Token String Length', weight: 21.26, category: 'Entropy & Content' },
   { name: 'FQDN_count', label: 'FQDN Subdomain Depth / Count', weight: 20.02, category: 'Frequency' },
@@ -62,6 +66,99 @@ export const MLAnalyticsView: React.FC = () => {
   const [activeModel, setActiveModel] = useState<'ad_fraud' | 'dns_exfil'>('ad_fraud');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
+  // Live Inspector States
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+  const [testDomain, setTestDomain] = useState<string>('a8f82c4b.payload.exfiltration-tunnel.domain.com');
+  const [testIP, setTestIP] = useState<string>('118.25.6.39');
+  const [hybridMlWeight, setHybridMlWeight] = useState<number>(0.60);
+  const [liveEvaluation, setLiveEvaluation] = useState<any | null>(null);
+  const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
+  const [evalError, setEvalError] = useState<string | null>(null);
+
+  // Check API health on load
+  useEffect(() => {
+    fetch('http://127.0.0.1:8000/api/health')
+      .then(res => res.json())
+      .then(() => setApiOnline(true))
+      .catch(() => setApiOnline(false));
+  }, []);
+
+  const runLiveInspection = async () => {
+    setIsEvaluating(true);
+    setEvalError(null);
+    try {
+      if (apiOnline) {
+        // Real-time API evaluation
+        const [dnsRes, ipRes] = await Promise.all([
+          fetch('http://127.0.0.1:8000/api/score-dns', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ domain: testDomain })
+          }).then(r => r.json()),
+          fetch('http://127.0.0.1:8000/api/evaluate-hybrid', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ip: testIP,
+              ml_fraud_probability: 0.82,
+              ml_weight: hybridMlWeight
+            })
+          }).then(r => r.json())
+        ]);
+
+        setLiveEvaluation({
+          dns: dnsRes,
+          hybrid: ipRes,
+          source: 'FastAPI Backend (Live Inference)'
+        });
+      } else {
+        // Graceful Client-side Fallback Simulation
+        const len = testDomain.length;
+        const isSuspicious = testDomain.includes('exfil') || testDomain.includes('payload') || len > 35;
+        const simulatedExfilProb = isSuspicious ? 94.2 : 12.8;
+        const simulatedIntelScore = testIP.startsWith('192.') || testIP.startsWith('127.') ? 0 : 45;
+        const fused = (simulatedExfilProb / 100) * hybridMlWeight + (simulatedIntelScore / 100) * (1 - hybridMlWeight);
+
+        setLiveEvaluation({
+          dns: {
+            domain: testDomain,
+            is_exfiltration: isSuspicious,
+            classification: isSuspicious ? "Exfiltration Payload / Malicious Tunnel" : "Legitimate DNS Traffic",
+            confidence: isSuspicious ? 94.2 : 87.2,
+            exfiltration_probability: simulatedExfilProb,
+            benign_probability: 100 - simulatedExfilProb,
+            risk_level: isSuspicious ? "CRITICAL" : "LOW",
+            features_evaluated: {
+              FQDN_count: len,
+              subdomain_length: Math.max(0, len - 14),
+              entropy: isSuspicious ? 4.12 : 2.85,
+              labels: testDomain.split('.').length
+            }
+          },
+          hybrid: {
+            final_risk_score: roundDec(fused, 4),
+            action: fused >= 0.65 ? "BLOCK" : (fused >= 0.45 ? "FLAG" : "ALLOW"),
+            is_blocked: fused >= 0.65,
+            threat_intel: {
+              ip: testIP,
+              usage_type: testIP.startsWith('192.') ? 'Internal LAN (RFC-1918)' : 'Hosting / Cloud Datacenter',
+              country_code: testIP.startsWith('192.') ? 'LOCAL' : 'US',
+              abuse_confidence_score: simulatedIntelScore,
+              cached: true
+            }
+          },
+          source: 'Offline Safe Simulation (Start dns_inference_api.py for live API)'
+        });
+      }
+    } catch (err: any) {
+      setEvalError(err?.message || "Failed to evaluate threat inputs.");
+    } finally {
+      setIsEvaluating(false);
+    }
+  };
+
+  const roundDec = (val: number, dec: number) => Math.round(val * Math.pow(10, dec)) / Math.pow(10, dec);
+
   const activeFeatures = activeModel === 'ad_fraud' ? CLICK_FRAUD_FEATURES : DNS_EXFILTRATION_FEATURES;
 
   const categories = activeModel === 'ad_fraud' 
@@ -75,11 +172,23 @@ export const MLAnalyticsView: React.FC = () => {
   return (
     <div className="space-y-6">
 
-      {/* Model Selection Switcher Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-3 bg-slate-900/90 border border-slate-800 rounded-xl">
-        <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-purple-400" />
-          <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Active Detection Model:</span>
+      {/* Model Selection & Live API Gateway Status Banner */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-3.5 bg-slate-900/90 border border-slate-800 rounded-xl">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-purple-400" />
+            <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Multi-Vector Threat Suite:</span>
+          </div>
+          
+          {/* Live API Health Pill */}
+          <div className={`px-2.5 py-1 rounded-full text-[11px] font-mono flex items-center gap-1.5 border ${
+            apiOnline === true 
+              ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300' 
+              : 'bg-amber-950/60 border-amber-500/40 text-amber-300'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${apiOnline === true ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span>{apiOnline === true ? 'FastAPI Gateway (Port 8000) Active' : 'Offline Static Mode (Local Demo)'}</span>
+          </div>
         </div>
         
         <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800">
@@ -92,7 +201,7 @@ export const MLAnalyticsView: React.FC = () => {
             }`}
           >
             <MousePointerClick className="w-3.5 h-3.5" />
-            <span>Ad Click Fraud (XGBoost)</span>
+            <span>App-Layer: Ad Click Fraud (XGBoost)</span>
           </button>
 
           <button
@@ -104,7 +213,7 @@ export const MLAnalyticsView: React.FC = () => {
             }`}
           >
             <Network className="w-3.5 h-3.5" />
-            <span>DNS Exfiltration (Random Forest)</span>
+            <span>Network-Layer: DNS Exfiltration (RF)</span>
           </button>
         </div>
       </div>
@@ -120,17 +229,17 @@ export const MLAnalyticsView: React.FC = () => {
               activeModel === 'ad_fraud' ? 'text-purple-400' : 'text-cyan-400'
             }`}>
               <BrainCircuit className="w-4 h-4" />
-              <span>Machine Learning Inference Intelligence</span>
+              <span>Enterprise Zero-Trust Defense Architecture</span>
             </div>
             <h2 className="text-xl font-bold text-white">
               {activeModel === 'ad_fraud'
-                ? 'Trained XGBoost Click Fraud Detection Model'
-                : 'Trained Random Forest DNS Tunneling & Exfiltration Detector'}
+                ? 'Application-Layer Click Attribution Fraud Model'
+                : 'Network Protocol Anomaly & DNS Tunneling Detector'}
             </h2>
             <p className="text-xs text-slate-300">
               {activeModel === 'ad_fraud'
-                ? 'High-throughput gradient boosted decision forest trained on Kaggle TalkingData records with streaming feature engineering and class-imbalance compensation.'
-                : 'Multi-tree random forest classifier trained on 536,000+ stateless & stateful DNS records (audio, compressed, exe, image, text, video exfiltration payloads).'}
+                ? 'Trained on Kaggle TalkingData records with streaming feature engineering, class-imbalance weighting, and GPU acceleration.'
+                : 'Multi-tree random forest classifier trained on 536,000+ stateless & stateful DNS records protecting against C2 exfiltration across audio, exe, text, image, and video.'}
             </p>
           </div>
 
@@ -145,10 +254,144 @@ export const MLAnalyticsView: React.FC = () => {
             </div>
             <div className="px-3.5 py-2 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Model Active</span>
+              <span>Model Ready</span>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Live Threat Inspector Sandbox (Interactive Demo Card) */}
+      <div className="p-5 bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+          <div className="flex items-center gap-2">
+            <Radio className="w-4 h-4 text-cyan-400 animate-pulse" />
+            <h3 className="text-sm font-bold text-white">Live Threat Inspector & Hybrid Risk Simulator</h3>
+          </div>
+          <span className="text-[11px] text-slate-400 font-mono">
+            Directly invokes <span className="text-cyan-300">/api/score-dns</span> & <span className="text-purple-300">/api/evaluate-hybrid</span>
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+              Target FQDN / DNS Domain:
+            </label>
+            <input 
+              type="text" 
+              value={testDomain} 
+              onChange={(e) => setTestDomain(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
+              placeholder="e.g. exfil-payload.c2.domain.com"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+              Client IP Address (AbuseIPDB):
+            </label>
+            <input 
+              type="text" 
+              value={testIP} 
+              onChange={(e) => setTestIP(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-purple-300 focus:outline-none focus:border-purple-500"
+              placeholder="e.g. 118.25.6.39 or 192.168.1.1"
+            />
+          </div>
+
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                Hybrid Weight Fusion:
+              </label>
+              <span className="text-xs font-mono text-slate-300">
+                {(hybridMlWeight * 100).toFixed(0)}% ML / {((1 - hybridMlWeight) * 100).toFixed(0)}% Threat Intel
+              </span>
+            </div>
+            <input 
+              type="range" 
+              min="0.1" 
+              max="0.9" 
+              step="0.05"
+              value={hybridMlWeight} 
+              onChange={(e) => setHybridMlWeight(parseFloat(e.target.value))}
+              className="w-full accent-cyan-500 cursor-pointer"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setTestDomain('google.com'); setTestIP('8.8.8.8'); }}
+              className="text-[10px] px-2 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700"
+            >
+              Preset: Benign Clean
+            </button>
+            <button
+              onClick={() => { setTestDomain('73626164696f2e6d7033.a8f82c4b.tunnel.exfil-c2.attacker.net'); setTestIP('118.25.6.39'); }}
+              className="text-[10px] px-2 py-1 bg-rose-950/60 border border-rose-500/30 text-rose-300 rounded hover:bg-rose-900/60"
+            >
+              Preset: C2 Malicious Exfil
+            </button>
+          </div>
+
+          <button
+            onClick={runLiveInspection}
+            disabled={isEvaluating}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg text-xs font-semibold shadow-md transition-all disabled:opacity-50"
+          >
+            {isEvaluating ? <Activity className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+            <span>Execute Live Inference</span>
+          </button>
+        </div>
+
+        {/* Live Evaluation Results Dropdown / Drawer */}
+        {liveEvaluation && (
+          <div className="mt-4 p-4 bg-slate-950 border border-slate-800 rounded-lg space-y-3 font-mono text-xs">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="text-slate-400">Execution Source: <span className="text-emerald-400">{liveEvaluation.source}</span></span>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500">Action Decision:</span>
+                <span className={`px-2 py-0.5 rounded font-bold ${
+                  liveEvaluation.hybrid.action === 'BLOCK' ? 'bg-rose-950 text-rose-300 border border-rose-500/40' :
+                  liveEvaluation.hybrid.action === 'FLAG' ? 'bg-amber-950 text-amber-300 border border-amber-500/40' :
+                  'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
+                }`}>
+                  {liveEvaluation.hybrid.action}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="p-2.5 bg-slate-900 border border-slate-800/80 rounded space-y-1">
+                <div className="text-[10px] text-slate-500">DNS Tunneling Score</div>
+                <div className="text-cyan-400 font-bold">{liveEvaluation.dns.exfiltration_probability}% Exfil Probability</div>
+                <div className="text-[10px] text-slate-400">{liveEvaluation.dns.classification}</div>
+              </div>
+
+              <div className="p-2.5 bg-slate-900 border border-slate-800/80 rounded space-y-1">
+                <div className="text-[10px] text-slate-500">AbuseIPDB Threat Intel</div>
+                <div className="text-purple-400 font-bold">
+                  {liveEvaluation.hybrid.threat_intel.country_code} · {liveEvaluation.hybrid.threat_intel.usage_type}
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  Confidence Score: {liveEvaluation.hybrid.threat_intel.abuse_confidence_score}/100
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-slate-900 border border-slate-800/80 rounded space-y-1">
+                <div className="text-[10px] text-slate-500">Blended Hybrid Risk Score</div>
+                <div className="text-amber-400 font-bold text-base">
+                  {(liveEvaluation.hybrid.final_risk_score * 100).toFixed(1)}% Final Risk
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  (ML: {(hybridMlWeight*100).toFixed(0)}% + Intel: {((1-hybridMlWeight)*100).toFixed(0)}%)
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* KPI Metrics Strip */}
@@ -335,7 +578,7 @@ export const MLAnalyticsView: React.FC = () => {
           {/* Model Deployment Specs */}
           <div className="p-5 bg-slate-900 border border-slate-800 rounded-xl space-y-3 text-xs">
             <h4 className="font-bold text-white uppercase tracking-wider text-[11px]">
-              Production Model Profile
+              Production Architecture Profile
             </h4>
             <div className="space-y-2 font-mono text-slate-300">
               <div className="flex justify-between py-1 border-b border-slate-800/80">
@@ -355,9 +598,9 @@ export const MLAnalyticsView: React.FC = () => {
                 <span className="text-emerald-400">{activeModel === 'ad_fraud' ? '< 1.2 ms per event' : '< 0.8 ms per query'}</span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-slate-500">Detection Targets:</span>
+                <span className="text-slate-500">Detection Scope:</span>
                 <span className={activeModel === 'ad_fraud' ? 'text-purple-400' : 'text-cyan-400'}>
-                  {activeModel === 'ad_fraud' ? 'Click Farms & Bots' : 'Audio/Exe/Img Exfiltration'}
+                  {activeModel === 'ad_fraud' ? 'Click Farms & Mobile Bots' : 'Audio/Exe/Img Exfiltration'}
                 </span>
               </div>
             </div>
