@@ -1,0 +1,43 @@
+{
+  "model_name": "dns_detector_rf",
+  "algorithm": "RandomForestClassifier",
+  "framework": "scikit-learn",
+  "version": "1.0.0",
+  "trained_at": "2026-11-04T05:01:50Z",
+  "dataset": {
+    "source": "data/new (Light + Heavy DNS Traffic)",
+    "records_trained": 536138,
+    "classes": {
+      "0": "Benign",
+      "1": "Exfiltration"
+    }
+  },
+  "metrics": {
+    "roc_auc": 0.8055,
+    "accuracy": 0.8229,
+    "exfiltration_recall": 0.9996,
+    "benign_precision": 0.9991
+  },
+  "hyperparameters": {
+    "n_estimators": 100,
+    "max_depth": 16,
+    "random_state": 42
+  },
+  "feature_columns": [
+    "FQDN_count",
+    "subdomain_length",
+    "upper",
+    "lower",
+    "numeric",
+    "entropy",
+    "special",
+    "labels",
+    "labels_max",
+    "labels_average",
+    "len",
+    "subdomain",
+    "longest_word_len",
+    "sld_len"
+  ]
+}
+
