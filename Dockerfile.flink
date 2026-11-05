@@ -1,0 +1,9 @@
+FROM maven:3.9.9-eclipse-temurin-17 AS build
+WORKDIR /workspace
+COPY flink-job/pom.xml ./pom.xml
+RUN mvn -B -q dependency:go-offline
+COPY flink-job/src ./src
+RUN mvn -B -q package
+
+FROM flink:1.20.1-scala_2.12-java17
+COPY --from=build /workspace/target/dns-threat-pipeline-1.0.0.jar /opt/flink/usrlib/dns-threat-pipeline.jar

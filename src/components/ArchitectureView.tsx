@@ -28,70 +28,70 @@ interface ArchitectureNode {
 
 const ARCHITECTURE_NODES: ArchitectureNode[] = [
   {
-    id: 'ingestion',
+    id: 'source-api',
     step: '01',
-    title: 'Kafka Telemetry Ingestion',
-    category: 'Ingestion Layer',
+    title: 'Threat Event API',
+    category: 'External Source',
     icon: Server,
-    summary: 'High-throughput distributed message broker streaming raw ad click and impression payloads across 6 balanced partitions.',
-    latency: '< 5 ms',
-    throughput: '35,000 EPS',
-    features: ['KRaft consensus protocol', 'Strict timestamped event ordering', '6 parallel partition streams']
+    summary: 'An optional authenticated REST poller reads cursor-paginated DNS threat events. Until the source URL is configured, events can be pushed through the backend ingestion endpoint.',
+    latency: 'Configured interval',
+    throughput: 'Source-dependent',
+    features: ['Credentials supplied through environment variables', 'Cursor and response paths configurable', 'No browser-generated events']
   },
   {
-    id: 'windowing',
+    id: 'kafka-input',
     step: '02',
-    title: 'Flink Stateful Windowing',
-    category: 'Stream Engine',
-    icon: Zap,
-    summary: 'Calculates rolling 10-second sliding and 60-second tumbling window metrics per IP address and User ID backed by RocksDB.',
-    latency: '< 15 ms',
-    throughput: '30,000 EPS',
-    features: ['Out-of-order event watermarks', 'Incremental RocksDB checkpointing', 'Rolling IP velocity counters']
+    title: 'Kafka Input Topic',
+    category: 'Durable Ingestion',
+    icon: Database,
+    summary: 'The FastAPI gateway or API poller waits for an all-replica broker acknowledgement before reporting an event as accepted.',
+    latency: 'Broker dependent',
+    throughput: 'Kafka dependent',
+    features: ['KRaft single broker in local Compose', 'Source IP used as Kafka message key', 'Raw input topic is replayable']
   },
   {
-    id: 'joins',
+    id: 'flink-state',
     step: '03',
-    title: 'Stream Interval Joins',
-    category: 'Event Correlation',
-    icon: Layers,
-    summary: 'Temporal interval join matching click events with prior impression events to immediately catch Ghost Click fraud.',
-    latency: '< 20 ms',
-    throughput: '28,000 EPS',
-    features: ['Impression-to-Click time bounds', 'Bounded state retention', 'Ghost click immediate rejection']
+    title: 'Apache Flink State',
+    category: 'Stream Processing',
+    icon: Zap,
+    summary: 'A Java DataStream job consumes the input topic and tracks a processing-time rolling 60-second event count keyed by source IP.',
+    latency: 'Live job metric',
+    throughput: 'Cluster dependent',
+    features: ['Managed keyed ListState', 'Checkpointing enabled', 'Malformed records routed to a dead-letter topic']
   },
   {
     id: 'ml_scoring',
     step: '04',
-    title: 'XGBoost ML Inference',
-    category: 'AI Engine',
+    title: 'DNS Model Inference',
+    category: 'FastAPI ML Service',
     icon: Cpu,
-    summary: 'Sub-2ms real-time inference on 15 streaming behavioral features with 96.25% ROC-AUC and 99.90% precision.',
-    latency: '< 1.2 ms',
-    throughput: '45,000 EPS',
-    features: ['15 behavioral feature inputs', 'Class-imbalance weighted scoring', 'Real-time confidence evaluation']
+    summary: 'For each valid DNS event, Flink calls the FastAPI service, which derives the model feature schema and scores the query using the loaded Random Forest artifact.',
+    latency: 'Live request latency',
+    throughput: 'API dependent',
+    features: ['Uses the checked-in DNS model artifact', 'Model-derived probability replaces upstream score', 'HTTP failures are retried by Flink']
   },
   {
-    id: 'cep_rules',
+    id: 'fusion',
     step: '05',
-    title: 'CEP Pattern Matcher',
-    category: 'Pattern Engine',
+    title: 'Risk Fusion',
+    category: 'Decision Policy',
     icon: ShieldCheck,
-    summary: 'Deterministic Complex Event Processing automata catching high-speed click spamming bursts and fast CTIT click injections.',
-    latency: '< 2 ms',
-    throughput: '50,000 EPS',
-    features: ['CTIT threshold validation', 'Bot coordinate entropy analysis', 'Datacenter ASN blacklisting']
+    summary: 'The Flink operator combines the local DNS model probability with the event-provided abuse score and emits an ALLOW, FLAG, or BLOCK decision.',
+    latency: 'Included in job',
+    throughput: 'Cluster dependent',
+    features: ['60% local model / 40% supplied threat score', 'BLOCK at 0.65 and FLAG at 0.45', 'Original source event retained for audit']
   },
   {
     id: 'sink',
     step: '06',
-    title: 'Decision Routing & Sink',
-    category: 'Action & Storage',
-    icon: Database,
-    summary: 'Diverts valid clicks to advertiser billing and dispatches malicious clicks to quarantine storage and real-time security alerts.',
-    latency: '< 8 ms',
-    throughput: '30,000 EPS',
-    features: ['Side-output error routing', 'PostgreSQL / Parquet cold storage', 'Real-time billing gateway protection']
+    title: 'Kafka Output & UI',
+    category: 'Delivery',
+    icon: Activity,
+    summary: 'Scored events and malformed records go to separate Kafka topics. FastAPI consumes the scored topic and broadcasts it to the Live DNS Pipeline WebSocket.',
+    latency: 'Live status endpoint',
+    throughput: 'Kafka dependent',
+    features: ['At-least-once Kafka sink delivery', 'FastAPI WebSocket fan-out', 'Flink and Kafka health shown in the UI']
   }
 ];
 
@@ -116,7 +116,7 @@ export const ArchitectureView: React.FC = () => {
             Real-Time Stream Processing Topology
           </h2>
           <p className="text-xs text-slate-300">
-            Distributed event streaming architecture combining Apache Kafka, Apache Flink stateful sliding windows, and GPU-trained XGBoost inference.
+          Deployable DNS threat pipeline with optional REST polling, Kafka, a stateful Apache Flink job, FastAPI model inference, and a backend-fed WebSocket monitor.
           </p>
         </div>
       </div>

@@ -2,6 +2,7 @@
   "model_name": "dns_detector_rf",
   "algorithm": "RandomForestClassifier",
   "framework": "scikit-learn",
+  "framework_version": "1.4.0",
   "version": "1.0.0",
   "trained_at": "2026-11-04T05:01:50Z",
   "dataset": {
@@ -40,4 +41,3 @@
     "sld_len"
   ]
 }
-

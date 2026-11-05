@@ -143,6 +143,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="space-y-6">
 
+      <div className="rounded-lg border border-amber-700/50 bg-amber-950/30 px-4 py-3 text-xs text-amber-200">
+        <strong>Click-fraud demo:</strong> these events and Kafka/Flink-style metrics are generated in the browser,
+        not processed by the backend. Use <strong>Live DNS Pipeline</strong> for Kafka- and Apache Flink-backed events.
+      </div>
+
       {/* Top 6 KPI Summary Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-xl">
@@ -667,7 +672,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="p-3 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between text-xs text-slate-400">
-          <span>Showing latest {Math.min(filteredEvents.length, 40)} real-time Kafka stream events</span>
+          <span>Showing latest {Math.min(filteredEvents.length, 40)} simulated click events</span>
           <span>Click any event to view the 8 core project questions answered directly</span>
         </div>
 

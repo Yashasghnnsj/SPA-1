@@ -36,3 +36,5 @@ data/*.zip
 data/*.tar.gz
 data/new/
 
+# Java Flink job build artifacts
+flink-job/target/

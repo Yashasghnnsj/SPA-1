@@ -15,12 +15,12 @@ import threading
 import ipaddress
 import requests
 from typing import Dict, Any, Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 ABUSEIPDB_API_URL = "https://api.abuseipdb.com/api/v2/check"
-DEFAULT_API_KEY = os.getenv(
-    "ABUSEIPDB_API_KEY", 
-    "7853eaaa5f8c70314ec902752470c2a602e2f79ceb88493ab1c40bab3c9277c1d5c20d8c1e38dc17"
-)
+DEFAULT_API_KEY = os.getenv("ABUSEIPDB_API_KEY", "")
 
 CACHE_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "threat_cache.db")
 CACHE_TTL_SECONDS = 3600 * 24  # 24-hour cache persistence to strictly protect quota

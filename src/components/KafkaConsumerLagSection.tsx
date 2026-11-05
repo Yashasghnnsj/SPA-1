@@ -48,17 +48,17 @@ export const KafkaConsumerLagSection: React.FC<KafkaConsumerLagSectionProps> = (
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5 font-mono">
               <Server className="w-3.5 h-3.5" />
-              Kafka Broker & Flink Consumer Telemetry
+              Demo Kafka & Flink Telemetry (Simulated)
             </span>
             <span className="px-2 py-0.5 text-[10px] font-mono font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 rounded">
               Viva Stream Justification
             </span>
           </div>
           <h3 className="text-lg font-bold text-white mt-1">
-            Real-Time Kafka Consumer Lag & Partition Offset Matrix
+            Simulated Consumer Lag & Partition Offset Matrix
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            Continuous offset monitoring across topic <code className="text-cyan-300 font-mono">ad-click-events</code> (6 partitions) consumed by consumer group <code className="text-cyan-300 font-mono">{kafkaState.consumerGroup}</code>.
+            Demo values for topic <code className="text-cyan-300 font-mono">ad-click-events</code>; this view is not connected to a Kafka broker. Consumer group label: <code className="text-cyan-300 font-mono">{kafkaState.consumerGroup}</code>.
           </p>
         </div>
 

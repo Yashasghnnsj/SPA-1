@@ -22,6 +22,8 @@ import {
   Search
 } from 'lucide-react';
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+
 interface FeatureImportance {
   name: string;
   label: string;
@@ -77,9 +79,12 @@ export const MLAnalyticsView: React.FC = () => {
 
   // Check API health on load
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/health')
-      .then(res => res.json())
-      .then(() => setApiOnline(true))
+    fetch(`${API_BASE_URL}/api/health`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Health check returned HTTP ${res.status}.`);
+        return res.json();
+      })
+      .then((health) => setApiOnline(health.status === 'online'))
       .catch(() => setApiOnline(false));
   }, []);
 
@@ -87,77 +92,42 @@ export const MLAnalyticsView: React.FC = () => {
     setIsEvaluating(true);
     setEvalError(null);
     try {
-      if (apiOnline) {
-        // Real-time API evaluation
-        const [dnsRes, ipRes] = await Promise.all([
-          fetch('http://127.0.0.1:8000/api/score-dns', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ domain: testDomain })
-          }).then(r => r.json()),
-          fetch('http://127.0.0.1:8000/api/evaluate-hybrid', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              ip: testIP,
-              ml_fraud_probability: 0.82,
-              ml_weight: hybridMlWeight
-            })
-          }).then(r => r.json())
-        ]);
-
-        setLiveEvaluation({
-          dns: dnsRes,
-          hybrid: ipRes,
-          source: 'FastAPI Backend (Live Inference)'
-        });
-      } else {
-        // Graceful Client-side Fallback Simulation
-        const len = testDomain.length;
-        const isSuspicious = testDomain.includes('exfil') || testDomain.includes('payload') || len > 35;
-        const simulatedExfilProb = isSuspicious ? 94.2 : 12.8;
-        const simulatedIntelScore = testIP.startsWith('192.') || testIP.startsWith('127.') ? 0 : 45;
-        const fused = (simulatedExfilProb / 100) * hybridMlWeight + (simulatedIntelScore / 100) * (1 - hybridMlWeight);
-
-        setLiveEvaluation({
-          dns: {
-            domain: testDomain,
-            is_exfiltration: isSuspicious,
-            classification: isSuspicious ? "Exfiltration Payload / Malicious Tunnel" : "Legitimate DNS Traffic",
-            confidence: isSuspicious ? 94.2 : 87.2,
-            exfiltration_probability: simulatedExfilProb,
-            benign_probability: 100 - simulatedExfilProb,
-            risk_level: isSuspicious ? "CRITICAL" : "LOW",
-            features_evaluated: {
-              FQDN_count: len,
-              subdomain_length: Math.max(0, len - 14),
-              entropy: isSuspicious ? 4.12 : 2.85,
-              labels: testDomain.split('.').length
-            }
-          },
-          hybrid: {
-            final_risk_score: roundDec(fused, 4),
-            action: fused >= 0.65 ? "BLOCK" : (fused >= 0.45 ? "FLAG" : "ALLOW"),
-            is_blocked: fused >= 0.65,
-            threat_intel: {
-              ip: testIP,
-              usage_type: testIP.startsWith('192.') ? 'Internal LAN (RFC-1918)' : 'Hosting / Cloud Datacenter',
-              country_code: testIP.startsWith('192.') ? 'LOCAL' : 'US',
-              abuse_confidence_score: simulatedIntelScore,
-              cached: true
-            }
-          },
-          source: 'Offline Safe Simulation (Start dns_inference_api.py for live API)'
-        });
+      if (!apiOnline) {
+        throw new Error('FastAPI is unavailable. Start the backend to run live model inference.');
       }
-    } catch (err: any) {
-      setEvalError(err?.message || "Failed to evaluate threat inputs.");
+
+      const postJson = async (path: string, payload: object) => {
+        const response = await fetch(`${API_BASE_URL}${path}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(typeof result.detail === 'string' ? result.detail : `Request failed with HTTP ${response.status}.`);
+        }
+        return result;
+      };
+      const [dnsRes, ipRes] = await Promise.all([
+        postJson('/api/score-dns', { domain: testDomain }),
+        postJson('/api/evaluate-hybrid', {
+          ip: testIP,
+          ml_fraud_probability: 0.82,
+          ml_weight: hybridMlWeight,
+        }),
+      ]);
+
+      setLiveEvaluation({
+        dns: dnsRes,
+        hybrid: ipRes,
+        source: 'FastAPI Backend (Live Inference)',
+      });
+    } catch (err: unknown) {
+      setEvalError(err instanceof Error ? err.message : 'Failed to evaluate threat inputs.');
     } finally {
       setIsEvaluating(false);
     }
   };
-
-  const roundDec = (val: number, dec: number) => Math.round(val * Math.pow(10, dec)) / Math.pow(10, dec);
 
   const activeFeatures = activeModel === 'ad_fraud' ? CLICK_FRAUD_FEATURES : DNS_EXFILTRATION_FEATURES;
 
@@ -187,7 +157,7 @@ export const MLAnalyticsView: React.FC = () => {
               : 'bg-amber-950/60 border-amber-500/40 text-amber-300'
           }`}>
             <span className={`w-2 h-2 rounded-full ${apiOnline === true ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-            <span>{apiOnline === true ? 'FastAPI Gateway (Port 8000) Active' : 'Offline Static Mode (Local Demo)'}</span>
+            <span>{apiOnline === true ? 'FastAPI Gateway Active' : 'FastAPI unavailable — live inference disabled'}</span>
           </div>
         </div>
         

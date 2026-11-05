@@ -6,12 +6,13 @@ import { MLAnalyticsView } from './components/MLAnalyticsView';
 import { ArchitectureView } from './components/ArchitectureView';
 import { ClickDetailModal } from './components/ClickDetailModal';
 import { ExportReportModal } from './components/ExportReportModal';
+import { DnsThreatPipelineView } from './components/DnsThreatPipelineView';
 import { AdClickEvent, FlinkEngineState, KafkaConsumerLagState } from './types/fraud';
 import { globalFlinkStream } from './services/streamSimulator';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
-  const [isStreamRunning, setIsStreamRunning] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('live-pipeline');
+  const [isStreamRunning, setIsStreamRunning] = useState<boolean>(false);
   const [engineState, setEngineState] = useState<FlinkEngineState>(globalFlinkStream.getState());
   const [kafkaState, setKafkaState] = useState<KafkaConsumerLagState>(globalFlinkStream.getKafkaLagState());
   const [events, setEvents] = useState<AdClickEvent[]>([]);
@@ -19,7 +20,11 @@ export default function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    globalFlinkStream.start();
+    if (activeTab !== 'dashboard' && activeTab !== 'attack-lab') {
+      globalFlinkStream.stop();
+      setIsStreamRunning(false);
+      return;
+    }
 
     const unsubscribe = globalFlinkStream.subscribe((newEvent, newEngineState, newKafkaState) => {
       setEvents((prev) => [newEvent, ...prev.slice(0, 79)]);
@@ -29,11 +34,14 @@ export default function App() {
       }
     });
 
+    globalFlinkStream.start();
+    setIsStreamRunning(true);
+
     return () => {
       unsubscribe();
       globalFlinkStream.stop();
     };
-  }, []);
+  }, [activeTab]);
 
   const handleToggleStream = () => {
     if (isStreamRunning) {
@@ -64,6 +72,8 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {activeTab === 'live-pipeline' && <DnsThreatPipelineView />}
+
         {activeTab === 'dashboard' && (
           <DashboardView
             engineState={engineState}
@@ -114,14 +124,12 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span className="font-semibold text-slate-300">FlinkGuard</span>
             <span>·</span>
-            <span>Real-Time Ad Click Fraud Prevention Platform</span>
+            <span>API-ingested DNS Threat Detection Pipeline</span>
           </div>
           <div className="flex items-center gap-4 text-slate-500 font-mono text-[11px]">
-            <span>Latency &lt; 25ms</span>
+            <span>Kafka → Apache Flink → DNS ML</span>
             <span>·</span>
-            <span>Apache Flink & Kafka</span>
-            <span>·</span>
-            <span>XGBoost ML</span>
+            <span>Click fraud is available as a separate demo</span>
           </div>
         </div>
       </footer>

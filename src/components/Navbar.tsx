@@ -1,7 +1,7 @@
 import React from 'react';
 import { ShieldCheck, Play, Pause, FileDown, BrainCircuit, Activity, Flame, Workflow } from 'lucide-react';
 
-export type ActiveTab = 'dashboard' | 'attack-lab' | 'ml-analytics' | 'architecture';
+export type ActiveTab = 'live-pipeline' | 'dashboard' | 'attack-lab' | 'ml-analytics' | 'architecture';
 
 interface NavbarProps {
   activeTab: ActiveTab;
@@ -28,7 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <ShieldCheck className="w-5 h-5" />
           </div>
           <button 
-            onClick={() => setActiveTab('dashboard')} 
+            onClick={() => setActiveTab('live-pipeline')}
             className="text-lg font-bold tracking-tight text-white hover:text-cyan-400 transition-colors text-left flex items-center gap-2"
           >
             <span>FlinkGuard</span>
@@ -41,6 +41,18 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Navigation Tabs */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
           <button
+            onClick={() => setActiveTab('live-pipeline')}
+            className={`whitespace-nowrap transition-colors flex items-center gap-1.5 py-5 ${
+              activeTab === 'live-pipeline'
+                ? 'text-cyan-400 font-semibold border-b-2 border-cyan-400'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            <span>Live DNS Pipeline</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('dashboard')}
             className={`whitespace-nowrap transition-colors flex items-center gap-1.5 py-5 ${
               activeTab === 'dashboard'
@@ -49,7 +61,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <Activity className="w-4 h-4" />
-            <span>Live Monitor</span>
+            <span>Click Fraud Demo</span>
           </button>
 
           <button
@@ -91,18 +103,20 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-3">
-          <button
-            onClick={onToggleStream}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 border whitespace-nowrap ${
-              isStreamRunning
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
-                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
-            }`}
-            title={isStreamRunning ? 'Pause stream ingestion' : 'Resume stream ingestion'}
-          >
-            {isStreamRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-            <span>{isStreamRunning ? 'Pause Stream' : 'Resume Stream'}</span>
-          </button>
+          {(activeTab === 'dashboard' || activeTab === 'attack-lab') && (
+            <button
+              onClick={onToggleStream}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 border whitespace-nowrap ${
+                isStreamRunning
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
+                  : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+              }`}
+              title={isStreamRunning ? 'Pause demo stream' : 'Resume demo stream'}
+            >
+              {isStreamRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+              <span>{isStreamRunning ? 'Pause Demo' : 'Resume Demo'}</span>
+            </button>
+          )}
 
           <button
             onClick={onOpenExportModal}
